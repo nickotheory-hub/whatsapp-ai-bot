@@ -34,7 +34,15 @@ def webhook():
         print("[WEBHOOK DATA]", data)
 
         try:
-            message = data['entry'][0]['changes'][0]['value']['messages'][0]
+            entry = data['entry'][0]
+            change = entry['changes'][0]
+            value = change['value']
+
+            if 'messages' not in value:
+                print("[INFO] No messages field found in webhook. Probably an ack or delivery update.")
+                return "no message", 200
+
+            message = value['messages'][0]
             user_message = message['text']['body']
             sender_id = message['from']
             print(f"[MESSAGE] From: {sender_id} - Text: {user_message}")
@@ -50,7 +58,8 @@ def webhook():
             send_whatsapp_reply(sender_id, ai_reply)
 
         except Exception as e:
-            print("[ERROR]", e)
+            print("[ERROR] Exception occurred while processing POST request:")
+            print(e)
 
         return "ok", 200
 
