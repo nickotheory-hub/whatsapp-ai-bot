@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import openai
 import requests
 import os
+import sys
 
 app = Flask(__name__)
 load_dotenv()
@@ -32,7 +33,6 @@ def webhook():
         data = request.get_json(force=True, silent=True)
         print("[WEBHOOK] Received POST request")
         print("[WEBHOOK DATA]", data)
-        import sys
         sys.stdout.flush()
 
         try:
@@ -41,26 +41,37 @@ def webhook():
             value = change['value']
 
             if 'messages' not in value:
-                print("[INFO] No messages field found in webhook. Probably an ack or delivery update.")
-                return "no message", 200
+                print("[INFO] No 'messages' field found — likely a delivery receipt or status update.")
+                return "ok", 200
 
             message = value['messages'][0]
             user_message = message['text']['body']
             sender_id = message['from']
-            print(f"[MESSAGE] From: {sender_id} - Text: {user_message}")
+            print(f"[MESSAGE RECEIVED] From: {sender_id} — Message: {user_message}")
 
-            # GPT response
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": user_message}]
-            )
-            ai_reply = response['choices'][0]['message']['content']
-            print("[GPT REPLY]", ai_reply)
+            # OpenAI GPT call
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": user_message}]
+                )
+                ai_reply = response['choices'][0]['message']['content']
+                print("[GPT REPLY]", ai_reply)
 
-            send_whatsapp_reply(sender_id, ai_reply)
+                send_whatsapp_reply(sender_id, ai_reply)
+
+            except openai.error.AuthenticationError as e:
+                print("[OPENAI ERROR] Invalid API key or access denied:", e)
+                send_whatsapp_reply(sender_id, "⚠️ This bot is currently offline due to OpenAI authentication issues.")
+            except openai.error.RateLimitError as e:
+                print("[OPENAI ERROR] Rate limit or credit exhausted:", e)
+                send_whatsapp_reply(sender_id, "⚠️ Bot temporarily unavailable — rate limit or quota exceeded.")
+            except openai.error.OpenAIError as e:
+                print("[OPENAI ERROR] General API error:", e)
+                send_whatsapp_reply(sender_id, "⚠️ Something went wrong on the AI side. Try again later.")
 
         except Exception as e:
-            print("[ERROR] Exception occurred while processing POST request:")
+            print("[ERROR] Exception occurred in webhook processing:")
             print(e)
 
         return "ok", 200
@@ -76,10 +87,13 @@ def send_whatsapp_reply(to, message):
         "to": to,
         "text": {"body": message}
     }
-    res = requests.post(url, headers=headers, json=data)
-    print("[SEND] Response from WhatsApp:", res.status_code, res.text)
+    try:
+        res = requests.post(url, headers=headers, json=data)
+        print("[SEND] WhatsApp API responded with:", res.status_code)
+        print(res.text)
+    except Exception as e:
+        print("[SEND ERROR] Failed to send WhatsApp reply:", e)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
