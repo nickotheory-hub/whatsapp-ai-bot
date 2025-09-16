@@ -52,7 +52,7 @@ def webhook():
             # OpenAI GPT call
             try:
                 response = openai.ChatCompletion.create(
-                    model="gpt-4",
+                    model="gpt-3.5-turbo",
                     messages=[{"role": "user", "content": user_message}]
                 )
                 ai_reply = response['choices'][0]['message']['content']
@@ -97,3 +97,4 @@ def send_whatsapp_reply(to, message):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
