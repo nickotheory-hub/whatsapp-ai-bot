@@ -29,9 +29,11 @@ def webhook():
         return "Unauthorized", 403
 
     if request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(force=True, silent=True)
         print("[WEBHOOK] Received POST request")
         print("[WEBHOOK DATA]", data)
+        import sys
+        sys.stdout.flush()
 
         try:
             entry = data['entry'][0]
@@ -80,3 +82,4 @@ def send_whatsapp_reply(to, message):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
